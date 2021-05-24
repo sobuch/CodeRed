@@ -107,7 +107,7 @@ class CodeRedLib(object):
 
 
     def LB(self, w2, goal_w=None, t=None, stats=False):
-        tt     = zeros(self.n, dtype='bool') if t is None else 1 * t
+        tt     = zeros(self.n, dtype='bool') if t is None else t.copy()
         _stats = zeros(self.n+1, dtype='int64') if stats else None
 
         success = self.lib._LB(c_char_ptr(tt), w2, 
@@ -116,12 +116,12 @@ class CodeRedLib(object):
 
         if stats:
             return _stats
-        if success or goal_w is None:
+        if success:
             return tt
 
 
     def LBB(self, k1, w2, goal_w=None, t=None, stats=False):
-        tt     = zeros(self.n, dtype='bool') if t is None else 1 * t
+        tt     = zeros(self.n, dtype='bool') if t is None else t.copy()
         _stats = zeros(self.n+1, dtype='int64') if stats else None
 
         success = self.lib._LBB(c_char_ptr(tt), k1, w2,
@@ -130,5 +130,5 @@ class CodeRedLib(object):
 
         if stats:
             return _stats
-        if success or goal_w is None:
+        if success:
             return tt

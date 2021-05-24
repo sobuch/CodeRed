@@ -13,6 +13,10 @@ using namespace std;
 
 #define max_n maxn   // Hardcode maximal code length as a compilation parameter maxn
 
+#ifndef USE_SIZERED
+#define USE_SIZERED 1
+#endif
+
 typedef bitset<max_n> binvec;   
 typedef vector<binvec> binmat;
 
@@ -254,7 +258,7 @@ vector<int> start(size_t beg, size_t end, size_t w)
 {
     vector<int> res;
     res.push_back(beg-1);
-    for (size_t i = beg; i < beg+w; ++i) res.push_back(-1);
+    for (size_t i = beg; i < min(beg + w, k); ++i) res.push_back(-1);
     res.push_back(end);
     return res;
 }
@@ -317,8 +321,7 @@ bool LB(binvec& tt, size_t w2, int goal_w, uint64_t* stats)
     vector<int> enumerator = start(0, k, w2);
 
     // If no goal set, just return the best visited solution
-    int best_w = goal_w > 0 ? goal_w + 1 : tt.count();
-    if (best_w==0) best_w=n;
+    int best_w = goal_w > 0 ? goal_w + 1 : n + 1;
 
     while(next(t, enumerator))
     {
@@ -330,7 +333,7 @@ bool LB(binvec& tt, size_t w2, int goal_w, uint64_t* stats)
         if (goal_w > 0) return true;
         best_w = w;
     }
-    return (goal_w==0);
+    return (goal_w==0 && best_w <= n);
 }
 
 
@@ -341,7 +344,7 @@ inline void SizeRed(binvec& t, size_t beg, size_t end)
     {
         // This is the most critical peace: helping the compiler
         // For some reason using (t & P[i]).count() gets slow for n > 1024.
-        int64_t ham = (t, E[i]).count();
+        int64_t ham = (t & E[i]).count();
         if (2*ham > l[i]) t ^= B[i];
     }
 }
@@ -377,16 +380,12 @@ bool LBB(binvec& tt, size_t k1, size_t w2, int goal_w, uint64_t* stats)
         stream_SR[2*i+1] = B[k1 - 1 - i];
     }
 
-
     // If no goal set, just return the best visited solution
-    int best_w = goal_w > 0 ? goal_w + 1 : tt.count();
-    if (best_w==0) best_w=n;
+    int best_w = goal_w > 0 ? goal_w + 1 : n + 1;
 
     bool notover = true;
-    while(notover)
+    while((notover &= next(t, enumerator)))
     {
-
-        notover &= next(t, enumerator);
         ts[0] = t;
         notover &= next(t, enumerator);
         ts[1] = t;
@@ -408,9 +407,36 @@ bool LBB(binvec& tt, size_t k1, size_t w2, int goal_w, uint64_t* stats)
             best_w = w;
         }
     }
-    return (goal_w==0);
+    return (goal_w==0 && best_w <= n);
 }
 
+
+// Transform the problem to one where the desired condition on distance from bases holds
+binvec prepare_tt(const char* tt_)
+{
+	binvec tt;
+	for (int i = 0; i < n; ++i)
+	{
+		if (!tt_[i]) continue;
+
+		tt[i].flip();
+		int index = -1;
+		for (int j = 0; j < k; ++j)
+		{
+			if (B[j][i])
+			{
+				if (index >= 0)
+				{
+					index = -1;
+					break;
+				}
+				index = j;
+			}
+		}
+		if (index >= 0) tt ^= B[index];
+	}
+	return tt;
+}
 
 
 
@@ -471,18 +497,26 @@ extern "C"
     bool _LBB(char* tt_, size_t k1, size_t w2, int goal_w, uint64_t* stats)
     {
         binvec tt;
+#if USE_SIZERED
         for (int i = 0; i < n; ++i) tt[i] = tt_[i];
+#else
+        tt = prepare_tt(tt_);
+#endif
         bool res = LBB(tt, k1, w2, goal_w, stats);
-        for (int i = 0; i < n; ++i) tt_[i] = tt[i];
+        for (int i = 0; i < n; ++i) tt_[i] ^= tt[i];
         return res;
     }
 
     bool _LB(char* tt_, size_t w2, int goal_w, uint64_t* stats)
     {
         binvec tt;
+#if USE_SIZERED
         for (int i = 0; i < n; ++i) tt[i] = tt_[i];
+#else
+        tt = prepare_tt(tt_);
+#endif
         bool res = LB(tt, w2, goal_w, stats);
-        for (int i = 0; i < n; ++i) tt_[i] = tt[i];
+        for (int i = 0; i < n; ++i) tt_[i] ^= tt[i];
         return res;
     }
 
@@ -512,7 +546,6 @@ extern "C"
     {
         EpiSort();
     }
-
 
     void _SemiSystematize()
     {
